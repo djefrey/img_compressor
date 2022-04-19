@@ -9,26 +9,31 @@ import System.Random ( StdGen, getStdRandom, randomR )
 
 import Options.Applicative
 import Data.Semigroup ((<>))
-import Data.Int ( Int8 )
+import Data.List ( elemIndex )
 import Text.Read ( readMaybe )
 
 type Point = (Int, Int)
-type Color = (Int8, Int8, Int8)
+type Color = (Int, Int, Int)
 
 data Pixel = Pixel {
-    getPos :: Point,
-    getColor :: Color
+    pGetPos :: Point,
+    pGetColor :: Color
 } deriving (Show)
 
 data Opts = Opts {
-    getColors :: Int,
-    getLimit :: Float,
-    getPath :: String
+    oGetColors :: Int,
+    oGetLimit :: Float,
+    oGetPath :: String
 }
 
-getRed   :: Color -> Int8
-getGreen :: Color -> Int8
-getBlue  :: Color -> Int8
+data Cluster = Cluster {
+    cGetColor :: Color,
+    cGetPixels :: [Pixel]
+} deriving (Show)
+
+getRed   :: (a,b,c) -> a
+getGreen :: (a,b,c) -> b
+getBlue  :: (a,b,c) -> c
 getRed   (r,_,_) = r
 getGreen (_,g,_) = g
 getBlue  (_,_,b) = b
@@ -64,7 +69,7 @@ lineToPixel line =
         parseEntry :: [String] -> Pixel
         parseEntry (x:y:r:g:b:[]) =
             (Pixel (read x :: Int, read y :: Int)
-            (read r :: Int8, read g :: Int8, read b :: Int8))
+            (read r :: Int, read g :: Int, read b :: Int))
 
 parseImg :: [String] -> [Pixel]
 parseImg [] = []
@@ -93,10 +98,59 @@ printPixels (pixel:xs) = do
     putStrLn (show pixel)
     printPixels xs
 
+addToCluster :: Pixel -> Cluster -> Cluster
+addToCluster pixel (Cluster color pixels) = (Cluster color (pixel:pixels))
+
+addToClosestCluster :: Pixel -> [Cluster] -> [Cluster]
+addToClosestCluster pixel clusters =
+    let dists = map (\c -> colorDist (cGetColor c) (pGetColor pixel)) clusters
+        (Just index) = elemIndex (minimum dists) dists
+        cluster = clusters !! index
+    in (take index clusters) ++ [(addToCluster pixel cluster)]
+    ++ (drop (index + 1) clusters)
+
+findClosestClusters :: [Pixel] -> [Cluster] -> [Cluster]
+findClosestClusters [] clusters = clusters
+findClosestClusters (p:ps) clusters =
+    let updatedClusters = addToClosestCluster p clusters
+    in findClosestClusters ps updatedClusters
+
+sumColor :: Color -> Color -> Color
+sumColor (r1,g1,b1) (r2,g2,b2) = ((r1 + r2),(g1 + g2),(b1 + b2))
+
+divColor :: Color -> Int -> Color
+divColor (r,g,b) n = ((div r n),(div g n),(div b n))
+
+moveClusterCentroid :: Cluster -> Cluster
+moveClusterCentroid (Cluster _ pixels) =
+    let sum = foldr sumColor (0,0,0) (map pGetColor pixels)
+    in (Cluster (divColor sum (length pixels)) pixels)
+
+getBiggestClusterMove :: [Cluster] -> [Cluster] -> Float
+getBiggestClusterMove old new =
+    let pairs = zip (map cGetColor old) (map cGetColor new)
+    in maximum $ map (\(o,n) -> colorDist o n) pairs
+
+kmeans :: [Pixel] -> [Cluster] -> Float -> [Cluster]
+kmeans img clusters limit =
+    let pxUpdatedClusters = findClosestClusters img clusters
+        posUpdatedClusters = map moveClusterCentroid pxUpdatedClusters
+    in if getBiggestClusterMove clusters posUpdatedClusters >= limit ** 2
+        then kmeans img (map (\(Cluster color _) -> (Cluster color [])) posUpdatedClusters) limit
+        else posUpdatedClusters
+
+printData :: Show a => [a] -> IO ()
+printData [] = return ()
+printData (x:xs) =
+    (putStrLn $ show x)
+    >> printData xs
+
 main :: IO ()
 main = do
     opts <- execParser optsParser
-    file <- readFile (getPath opts)
+    file <- readFile (oGetPath opts)
     let img = parseImg (lines file)
-    pixels <- chooseRandom (getColors opts) img
-    putStrLn $ show $ (colorDist (getColor $ (pixels !! 0)) (getColor $ (pixels !! 1)))
+    colors <- chooseRandom (oGetColors opts) (map (\p -> pGetColor p) img)
+    printData colors
+    let clusters = kmeans img (map (\c -> (Cluster c [])) colors) (oGetLimit opts)
+    printData clusters
