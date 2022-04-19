@@ -15,21 +15,25 @@ import Text.Read ( readMaybe )
 type Point = (Int, Int)
 type Color = (Int, Int, Int)
 
-data Pixel = Pixel {
-    pGetPos :: Point,
-    pGetColor :: Color
-} deriving (Show)
-
 data Opts = Opts {
     oGetColors :: Int,
     oGetLimit :: Float,
     oGetPath :: String
 }
 
+data Pixel = Pixel {
+    pGetPos :: Point,
+    pGetColor :: Color
+}
+instance Show Pixel where
+    show = showPixel
+
 data Cluster = Cluster {
     cGetColor :: Color,
     cGetPixels :: [Pixel]
-} deriving (Show)
+}
+instance Show Cluster where
+    show = showCluster
 
 getRed   :: (a,b,c) -> a
 getGreen :: (a,b,c) -> b
@@ -145,12 +149,19 @@ printData (x:xs) =
     (putStrLn $ show x)
     >> printData xs
 
+showPixel :: Pixel -> String
+showPixel (Pixel pos color) = (show pos) ++ " " ++ (show color)
+
+showCluster :: Cluster -> String
+showCluster (Cluster color pixels) =
+    let str = "--\n" ++ (show color) ++ "\n-\n" ++ foldr (++) "" (map (\p -> (show p) ++ "\n") pixels)
+    in take ((length str) - 1) str
+
 main :: IO ()
 main = do
     opts <- execParser optsParser
     file <- readFile (oGetPath opts)
     let img = parseImg (lines file)
     colors <- chooseRandom (oGetColors opts) (map (\p -> pGetColor p) img)
-    printData colors
     let clusters = kmeans img (map (\c -> (Cluster c [])) colors) (oGetLimit opts)
     printData clusters
