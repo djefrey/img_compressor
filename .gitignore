@@ -1,5 +1,6 @@
 .stack-work/
 *~
+*.cabal
 stack.yaml.lock
 imageCompressor
 exampleIn
