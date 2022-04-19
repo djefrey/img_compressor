@@ -96,12 +96,6 @@ colorDist start end =
         b = fromIntegral((getBlue end) - (getBlue start))
     in r ** 2 + g ** 2 + b ** 2
 
-printPixels :: [Pixel] -> IO ()
-printPixels [] = return ()
-printPixels (pixel:xs) = do
-    putStrLn (show pixel)
-    printPixels xs
-
 addToCluster :: Pixel -> Cluster -> Cluster
 addToCluster pixel (Cluster color pixels) = (Cluster color (pixel:pixels))
 
@@ -154,7 +148,8 @@ showPixel (Pixel pos color) = (show pos) ++ " " ++ (show color)
 
 showCluster :: Cluster -> String
 showCluster (Cluster color pixels) =
-    let str = "--\n" ++ (show color) ++ "\n-\n" ++ foldr (++) "" (map (\p -> (show p) ++ "\n") pixels)
+    let pxList = foldr (++) "" (map (\p -> (show p) ++ "\n") pixels)
+        str = "--\n" ++ (show color) ++ "\n-\n" ++ pxList
     in take ((length str) - 1) str
 
 main :: IO ()
