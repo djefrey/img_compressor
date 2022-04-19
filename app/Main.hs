@@ -73,11 +73,11 @@ parseImg (line:xs) = (lineToPixel line):(parseImg xs)
 removeAt :: [a] -> Int -> [a]
 removeAt list i = (take i list) ++ (drop (i + 1) list)
 
-chooseRandomPixels :: Int -> [Pixel] -> IO [Pixel]
-chooseRandomPixels 0 _ = return []
-chooseRandomPixels n list = do
+chooseRandom :: Int -> [a] -> IO [a]
+chooseRandom 0 _ = return []
+chooseRandom n list = do
     randIndex <- getStdRandom $ randomR (0, (length list) - 1)
-    points <- chooseRandomPixels (n - 1) (removeAt list randIndex)
+    points <- chooseRandom (n - 1) (removeAt list randIndex)
     return ((list !! randIndex):points)
 
 colorDist :: Color -> Color -> Float
@@ -98,5 +98,5 @@ main = do
     opts <- execParser optsParser
     file <- readFile (getPath opts)
     let img = parseImg (lines file)
-    pixels <- chooseRandomPixels (getColors opts) img
+    pixels <- chooseRandom (getColors opts) img
     putStrLn $ show $ (colorDist (getColor $ (pixels !! 0)) (getColor $ (pixels !! 1)))
