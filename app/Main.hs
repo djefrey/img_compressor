@@ -47,33 +47,28 @@ optsParser = info (options) (fullDesc)
     where
     options :: Parser Opts
     options = Opts
-            <$> option auto (
-                short 'n'
-                <> metavar "N"
+            <$> option auto (short 'n' <> metavar "N"
                 <> help "number of colors in the final image")
-            <*> option auto (
-                short 'l'
-                <> metavar "L"
+            <*> option auto (short 'l' <> metavar "L"
                 <> help "convergence limit")
-            <*> strOption (
-                short 'f'
-                <> metavar "F"
+            <*> strOption (short 'f' <> metavar "F"
                 <> help "path to the file containing the colors of the pixels")
+
+replaceCommas :: Char -> Char
+replaceCommas c =
+    case c of
+        ',' -> ' '
+        _ -> c
+
+parseEntry :: [String] -> Pixel
+parseEntry (x:y:r:g:b:[]) =
+    (Pixel (read x :: Int, read y :: Int)
+    (read r :: Int, read g :: Int, read b :: Int))
 
 lineToPixel :: String -> Pixel
 lineToPixel line =
     let values = words (map replaceCommas (filter (`notElem` "()") line))
     in parseEntry values
-    where
-        replaceCommas :: Char -> Char
-        replaceCommas c = case c of
-            ',' -> ' '
-            _ -> c
-
-        parseEntry :: [String] -> Pixel
-        parseEntry (x:y:r:g:b:[]) =
-            (Pixel (read x :: Int, read y :: Int)
-            (read r :: Int, read g :: Int, read b :: Int))
 
 parseImg :: [String] -> [Pixel]
 parseImg [] = []
@@ -134,7 +129,8 @@ kmeans img clusters limit =
     let pxUpdatedClusters = findClosestClusters img clusters
         posUpdatedClusters = map moveClusterCentroid pxUpdatedClusters
     in if getBiggestClusterMove clusters posUpdatedClusters >= limit ** 2
-        then kmeans img (map (\(Cluster color _) -> (Cluster color [])) posUpdatedClusters) limit
+        then kmeans img (map (\(Cluster color _)
+            -> (Cluster color [])) posUpdatedClusters) limit
         else posUpdatedClusters
 
 printData :: Show a => [a] -> IO ()
@@ -158,5 +154,8 @@ main = do
     file <- readFile (oGetPath opts)
     let img = parseImg (lines file)
     colors <- chooseRandom (oGetColors opts) (map (\p -> pGetColor p) img)
-    let clusters = kmeans img (map (\c -> (Cluster c [])) colors) (oGetLimit opts)
+    let clusters = kmeans img (map createClusters colors) (oGetLimit opts)
     printData clusters
+    where
+        createClusters :: Color -> Cluster
+        createClusters color = (Cluster color [])
