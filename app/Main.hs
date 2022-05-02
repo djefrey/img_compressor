@@ -10,6 +10,7 @@ import System.Random ( StdGen, getStdRandom, randomR )
 import Options.Applicative
 import Data.Semigroup ((<>))
 import Data.List ( elemIndex )
+import Data.Maybe ( isNothing )
 import Text.Read ( readMaybe )
 
 import Control.Exception ( try, IOException )
@@ -60,19 +61,27 @@ replaceCommas :: Char -> Char
 replaceCommas ',' = ' '
 replaceCommas c = c
 
-parseEntry :: [String] -> Pixel
-parseEntry (x:y:r:g:b:[]) =
-    (Pixel (read x :: Int, read y :: Int)
-    (read r :: Int, read g :: Int, read b :: Int))
+parseEntry :: [Maybe Int] -> Maybe Pixel
+parseEntry ((Just x):(Just y):(Just r):(Just g):(Just b):[]) =
+    Just (Pixel (x,y) (r,g,b))
+parseEntry _ = Nothing
 
-lineToPixel :: String -> Pixel
+lineToPixel :: String -> Maybe Pixel
 lineToPixel line =
-    let values = words (map replaceCommas (filter (`notElem` "()") line))
+    let splits = words $ map replaceCommas (filter (`notElem` "()") line)
+        values = map readMaybe splits
     in parseEntry values
 
-parseImg :: [String] -> [Pixel]
-parseImg [] = []
-parseImg (line:xs) = (lineToPixel line):(parseImg xs)
+readPixels :: [String] -> [Maybe Pixel]
+readPixels [] = []
+readPixels (line:xs) = (lineToPixel line):(readPixels xs)
+
+parseImg :: [String] -> IO [Pixel]
+parseImg lines =
+    let mayPx = readPixels lines
+    in if (length (filter isNothing mayPx) == 0)
+        then return $ map (\(Just px) -> px) mayPx
+        else exitWith (ExitFailure 84)
 
 removeAt :: [a] -> Int -> [a]
 removeAt list i = (take i list) ++ (drop (i + 1) list)
@@ -175,7 +184,7 @@ main :: IO ()
 main = do
     opts <- execParser optsParser
     file <- safeReadFile (oGetPath opts)
-    let img = parseImg (lines file)
+    img <- parseImg (lines file)
     case checkPixelsValues img of
         True -> run img opts
         False -> exitWith (ExitFailure 84)
