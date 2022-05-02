@@ -162,6 +162,9 @@ checkPixelsValues ((Pixel (x,y) (r,g,b)):ps) =
     && ((length (filter (\i -> i < 0 || i > 255 ) [r,g,b])) == 0)
     && (checkPixelsValues ps)
 
+checkOptsValues :: Opts -> Bool
+checkOptsValues (Opts colors limit _) = colors > 0 && limit > 0
+
 run :: [Pixel] -> Opts -> IO ()
 run img opts = do
     colors <- chooseRandom (oGetColors opts) (map (\p -> pGetColor p) img)
@@ -185,6 +188,6 @@ main = do
     opts <- execParser optsParser
     file <- safeReadFile (oGetPath opts)
     img <- parseImg (lines file)
-    case checkPixelsValues img of
+    case checkPixelsValues img && checkOptsValues opts of
         True -> run img opts
         False -> exitWith (ExitFailure 84)
