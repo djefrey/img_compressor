@@ -12,6 +12,8 @@ import Data.Semigroup ((<>))
 import Data.List ( elemIndex )
 import Text.Read ( readMaybe )
 
+import Control.Exception ( try, IOException )
+
 type Point = (Int, Int)
 type Color = (Int, Int, Int)
 
@@ -55,10 +57,8 @@ optsParser = info (options) (fullDesc)
                 <> help "path to the file containing the colors of the pixels")
 
 replaceCommas :: Char -> Char
-replaceCommas c =
-    case c of
-        ',' -> ' '
-        _ -> c
+replaceCommas ',' = ' '
+replaceCommas c = c
 
 parseEntry :: [String] -> Pixel
 parseEntry (x:y:r:g:b:[]) =
@@ -124,15 +124,6 @@ getBiggestClusterMove old new =
     let pairs = zip (map cGetColor old) (map cGetColor new)
     in maximum $ map (\(o,n) -> colorDist o n) pairs
 
-kmeans :: [Pixel] -> [Cluster] -> Float -> [Cluster]
-kmeans img clusters limit =
-    let pxUpdatedClusters = findClosestClusters img clusters
-        posUpdatedClusters = map moveClusterCentroid pxUpdatedClusters
-    in if getBiggestClusterMove clusters posUpdatedClusters >= limit ** 2
-        then kmeans img (map (\(Cluster color _)
-            -> (Cluster color [])) posUpdatedClusters) limit
-        else posUpdatedClusters
-
 printData :: Show a => [a] -> IO ()
 printData [] = return ()
 printData (x:xs) =
@@ -148,14 +139,44 @@ showCluster (Cluster color pixels) =
         str = "--\n" ++ (show color) ++ "\n-\n" ++ pxList
     in take ((length str) - 1) str
 
-main :: IO ()
-main = do
-    opts <- execParser optsParser
-    file <- readFile (oGetPath opts)
-    let img = parseImg (lines file)
+safeReadFile :: String -> IO String
+safeReadFile path = do
+    fileExecpt <- try $ readFile path
+    case (fileExecpt :: Either IOException String) of
+        Left _ -> exitWith (ExitFailure 84)
+        Right contents -> return contents
+
+checkPixelsValues :: [Pixel] -> Bool
+checkPixelsValues [] = True
+checkPixelsValues ((Pixel (x,y) (r,g,b)):ps) =
+    ((length (filter (\i -> i < 0) [x,y])) == 0)
+    && ((length (filter (\i -> i < 0 || i > 255 ) [r,g,b])) == 0)
+    && (checkPixelsValues ps)
+
+run :: [Pixel] -> Opts -> IO ()
+run img opts = do
     colors <- chooseRandom (oGetColors opts) (map (\p -> pGetColor p) img)
     let clusters = kmeans img (map createClusters colors) (oGetLimit opts)
     printData clusters
     where
         createClusters :: Color -> Cluster
         createClusters color = (Cluster color [])
+
+kmeans :: [Pixel] -> [Cluster] -> Float -> [Cluster]
+kmeans img clusters limit =
+    let pxUpdatedClusters = findClosestClusters img clusters
+        posUpdatedClusters = map moveClusterCentroid pxUpdatedClusters
+    in if getBiggestClusterMove clusters posUpdatedClusters >= limit ** 2
+        then kmeans img (map (\(Cluster color _)
+            -> (Cluster color [])) posUpdatedClusters) limit
+        else posUpdatedClusters
+
+
+main :: IO ()
+main = do
+    opts <- execParser optsParser
+    file <- safeReadFile (oGetPath opts)
+    let img = parseImg (lines file)
+    case checkPixelsValues img of
+        True -> run img opts
+        False -> exitWith (ExitFailure 84)
