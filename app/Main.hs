@@ -171,7 +171,6 @@ kmeans img clusters limit =
             -> (Cluster color [])) posUpdatedClusters) limit
         else posUpdatedClusters
 
-
 main :: IO ()
 main = do
     opts <- execParser optsParser
