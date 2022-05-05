@@ -108,8 +108,8 @@ addToClosestCluster pixel clusters =
     let dists = map (\c -> colorDist (cGetColor c) (pGetColor pixel)) clusters
         (Just index) = elemIndex (minimum dists) dists
         cluster = clusters !! index
-    in (take index clusters) ++ [(addToCluster pixel cluster)]
-    ++ (drop (index + 1) clusters)
+    in (take index clusters)
+    ++ (addToCluster pixel cluster):(drop (index + 1) clusters)
 
 findClosestClusters :: [Pixel] -> [Cluster] -> [Cluster]
 findClosestClusters [] clusters = clusters
