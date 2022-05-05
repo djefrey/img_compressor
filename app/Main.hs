@@ -124,9 +124,11 @@ divColor :: Color -> Int -> Color
 divColor (r,g,b) n = ((div r n),(div g n),(div b n))
 
 moveClusterCentroid :: Cluster -> Cluster
-moveClusterCentroid (Cluster _ pixels) =
+moveClusterCentroid (Cluster original pixels) =
     let sum = foldr sumColor (0,0,0) (map pGetColor pixels)
-    in (Cluster (divColor sum (length pixels)) pixels)
+    in if length pixels > 0
+    then (Cluster (divColor sum (length pixels)) pixels)
+    else (Cluster original pixels)
 
 getBiggestClusterMove :: [Cluster] -> [Cluster] -> Float
 getBiggestClusterMove old new =
