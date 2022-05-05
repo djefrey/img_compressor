@@ -183,9 +183,14 @@ kmeans img clusters limit =
             -> (Cluster color [])) posUpdatedClusters) limit
         else posUpdatedClusters
 
+handleParserResults :: ParserResult a -> IO a
+handleParserResults (Success dat) = return dat
+handleParserResults _ = exitWith (ExitFailure 84)
+
 main :: IO ()
 main = do
-    opts <- execParser optsParser
+    args <- getArgs
+    opts <- handleParserResults $ execParserPure defaultPrefs optsParser args
     file <- safeReadFile (oGetPath opts)
     img <- parseImg (lines file)
     case checkPixelsValues img && checkOptsValues opts of
